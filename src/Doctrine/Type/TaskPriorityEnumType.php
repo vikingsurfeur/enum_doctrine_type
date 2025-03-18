@@ -12,7 +12,7 @@ class TaskPriorityEnumType extends Type
 {
     public function getSQLDeclaration(array $column, AbstractPlatform $platform): string
     {
-        return $platform->getEnumDeclarationSQL($column);
+        return $platform->getStringTypeDeclarationSQL($column);
     }
 
     public function convertToDatabaseValue($value, AbstractPlatform $platform): ?string
