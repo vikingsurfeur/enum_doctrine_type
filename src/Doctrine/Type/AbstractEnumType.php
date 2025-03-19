@@ -50,9 +50,6 @@ abstract class AbstractEnumType extends Type
         return (string)$value;
     }
 
-    /**
-     * Convertit la valeur de la base de données en objet enum PHP
-     */
     public function convertToPHPValue($value, AbstractPlatform $platform): mixed
     {
         if ($value === null) {
@@ -61,24 +58,27 @@ abstract class AbstractEnumType extends Type
 
         $enumClass = static::getEnumClass();
 
-        // Utiliser la méthode tryFrom si elle existe
+        // Utiliser la méthode tryFrom pour les backed enums
         if (method_exists($enumClass, 'tryFrom')) {
-            return $enumClass::tryFrom($value);
+            $result = $enumClass::tryFrom($value);
+            if ($result === null) {
+                throw new \InvalidArgumentException(
+                    sprintf('La valeur "%s" n\'est pas valide pour l\'enum %s', $value, $enumClass)
+                );
+            }
+            return $result;
         }
 
-        // Si tryFrom n'existe pas, essayer from
-        if (method_exists($enumClass, 'from')) {
-            return $enumClass::from($value);
-        }
-
-        // Si aucune méthode n'est disponible, parcourir les cas
+        // Pour les enums non-backed, parcourir les cas
         foreach ($enumClass::cases() as $case) {
             if ($case->name === $value) {
                 return $case;
             }
         }
 
-        return null;
+        throw new \InvalidArgumentException(
+            sprintf('La valeur "%s" n\'est pas valide pour l\'enum %s', $value, $enumClass)
+        );
     }
 
     public function getName(): string
