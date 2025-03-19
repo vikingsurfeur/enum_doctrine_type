@@ -1,51 +1,212 @@
-# Symfony Docker
+# Doctrine Enum Type Handler
 
-A [Docker](https://www.docker.com/)-based installer and runtime for the [Symfony](https://symfony.com) web framework,
-with [FrankenPHP](https://frankenphp.dev) and [Caddy](https://caddyserver.com/) inside!
+Une implémentation robuste pour utiliser les enums PHP 8.1+ comme types personnalisés dans Doctrine ORM avec PostgreSQL.
 
-![CI](https://github.com/dunglas/symfony-docker/workflows/CI/badge.svg)
+## 📋 Présentation
 
-## Getting Started
+Ce projet fournit un ensemble de classes permettant d'utiliser les enums PHP comme types natifs dans PostgreSQL via Doctrine. La solution garantit l'intégrité des données en créant des types enum personnalisés dans PostgreSQL qui correspondent directement aux valeurs de vos enums PHP.
 
-1. If not already done, [install Docker Compose](https://docs.docker.com/compose/install/) (v2.10+)
-2. Run `docker compose build --no-cache` to build fresh images
-3. Run `docker compose up --pull always -d --wait` to set up and start a fresh Symfony project
-4. Open `https://localhost` in your favorite web browser and [accept the auto-generated TLS certificate](https://stackoverflow.com/a/15076602/1352334)
-5. Run `docker compose down --remove-orphans` to stop the Docker containers.
+### Caractéristiques
 
-## Features
+- ✅ Support complet des backed enums et des enums classiques
+- ✅ Validation côté base de données via des contraintes PostgreSQL natives
+- ✅ Conversion automatique entre les représentations PHP et SQL
+- ✅ Architecture extensible suivant les principes SOLID
+- ✅ Tests unitaires et d'intégration complets
 
-* Production, development and CI ready
-* Just 1 service by default
-* Blazing-fast performance thanks to [the worker mode of FrankenPHP](https://github.com/dunglas/frankenphp/blob/main/docs/worker.md) (automatically enabled in prod mode)
-* [Installation of extra Docker Compose services](docs/extra-services.md) with Symfony Flex
-* Automatic HTTPS (in dev and prod)
-* HTTP/3 and [Early Hints](https://symfony.com/blog/new-in-symfony-6-3-early-hints) support
-* Real-time messaging thanks to a built-in [Mercure hub](https://symfony.com/doc/current/mercure.html)
-* [Vulcain](https://vulcain.rocks) support
-* Native [XDebug](docs/xdebug.md) integration
-* Super-readable configuration
+## 🚀 Installation
 
-**Enjoy!**
+### Prérequis
 
-## Docs
+- PHP 8.1+
+- Symfony 6.0+
+- Doctrine ORM
+- PostgreSQL
 
-1. [Options available](docs/options.md)
-2. [Using Symfony Docker with an existing project](docs/existing-project.md)
-3. [Support for extra services](docs/extra-services.md)
-4. [Deploying in production](docs/production.md)
-5. [Debugging with Xdebug](docs/xdebug.md)
-6. [TLS Certificates](docs/tls.md)
-7. [Using MySQL instead of PostgreSQL](docs/mysql.md)
-8. [Using Alpine Linux instead of Debian](docs/alpine.md)
-9. [Using a Makefile](docs/makefile.md)
-10. [Updating the template](docs/updating.md)
-11. [Troubleshooting](docs/troubleshooting.md)
+### Configuration
 
-## License
+1. Clonez ce dépôt ou copiez les fichiers dans votre projet
 
-Symfony Docker is available under the MIT License.
+2. Enregistrez les types personnalisés dans le fichier de configuration Doctrine :
 
-## Credits
+```yaml
+# config/packages/doctrine.yaml
+doctrine:
+    dbal:
+        types:
+            task_priority_enum: App\Doctrine\Type\TaskPriorityEnumType
+```
 
-Created by [Kévin Dunglas](https://dunglas.dev), co-maintained by [Maxime Helias](https://twitter.com/maxhelias) and sponsored by [Les-Tilleuls.coop](https://les-tilleuls.coop).
+3. Exécutez les migrations pour créer les types enum dans PostgreSQL
+
+## 🔧 Utilisation
+
+### 1. Créer un Enum PHP
+
+```php
+<?php
+declare(strict_types=1);
+
+namespace App\Enum;
+
+enum TaskPriorityEnum: string
+{
+    case LOW = 'basse';
+    case MEDIUM = 'normale';
+    case HIGH = 'haute';
+    case CRITICAL = 'critique';
+}
+```
+
+### 2. Créer un Type Doctrine correspondant
+
+```php
+<?php
+declare(strict_types=1);
+
+namespace App\Doctrine\Type;
+
+use App\Enum\TaskPriorityEnum;
+
+class TaskPriorityEnumType extends AbstractEnumType
+{
+    public const TYPE_NAME = 'task_priority_enum';
+    
+    public static function getTypeName(): string
+    {
+        return self::TYPE_NAME;
+    }
+    
+    protected static function getEnumClass(): string
+    {
+        return TaskPriorityEnum::class;
+    }
+}
+```
+
+### 3. Utiliser le type dans une entité
+
+```php
+<?php
+namespace App\Entity;
+
+use App\Doctrine\Type\TaskPriorityEnumType;
+use App\Enum\TaskPriorityEnum;
+use Doctrine\ORM\Mapping as ORM;
+
+#[ORM\Entity]
+class Task
+{
+    #[ORM\Column(type: TaskPriorityEnumType::TYPE_NAME)]
+    private ?TaskPriorityEnum $priority = null;
+    
+    public function getPriority(): ?TaskPriorityEnum
+    {
+        return $this->priority;
+    }
+    
+    public function setPriority(TaskPriorityEnum $priority): self
+    {
+        $this->priority = $priority;
+        return $this;
+    }
+}
+```
+
+### 4. Créer une migration
+
+La migration doit créer le type enum PostgreSQL avant de créer les tables qui l'utilisent :
+
+```php
+<?php
+declare(strict_types=1);
+
+namespace DoctrineMigrations;
+
+use App\Doctrine\Type\TaskPriorityEnumType;
+use Doctrine\DBAL\Schema\Schema;
+use Doctrine\Migrations\AbstractMigration;
+
+final class Version20250319040536 extends AbstractMigration
+{
+    public function getDescription(): string
+    {
+        return 'Task / TaskPriorityEnumType';
+    }
+    
+    public function up(Schema $schema): void
+    {
+        // Créer d'abord le type enum
+        $this->addSql(TaskPriorityEnumType::getCreateTypeSQL());
+        
+        // Puis créer la table qui l'utilise
+        $this->addSql('CREATE TABLE task (
+            id INT GENERATED BY DEFAULT AS IDENTITY NOT NULL, 
+            name VARCHAR(255) NOT NULL, 
+            created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, 
+            priority task_priority_enum NOT NULL, 
+            PRIMARY KEY(id)
+        )');
+    }
+    
+    public function down(Schema $schema): void
+    {
+        $this->addSql('DROP TABLE task');
+        $this->addSql(TaskPriorityEnumType::getDropTypeSQL());
+    }
+}
+```
+
+## 💻 Fonctionnement interne
+
+### Architecture
+
+Le système repose sur trois composants principaux :
+
+1. **AbstractEnumType** : Classe abstraite gérant la conversion entre PHP et SQL
+2. **EnumTypeHelper** : Classe utilitaire pour générer le SQL nécessaire aux types enum PostgreSQL
+3. **Types concrets** (ex: TaskPriorityEnumType) : Implémentations spécifiques pour chaque enum
+
+### Flux de données
+
+1. En lecture, les valeurs de la base de données sont converties en instances d'enum PHP
+2. En écriture, les instances d'enum PHP sont converties en chaînes pour la base de données
+3. PostgreSQL valide que les valeurs correspondent bien aux valeurs autorisées par le type enum
+
+## 🧪 Tests
+
+Le projet inclut des tests unitaires et d'intégration pour garantir le bon fonctionnement.
+
+### Exécution des tests
+
+```bash
+# Installer les dépendances de développement
+composer require --dev phpunit/phpunit symfony/test-pack
+
+# Exécuter tous les tests
+./vendor/bin/phpunit
+
+# Exécuter uniquement les tests unitaires
+./vendor/bin/phpunit --testsuite Unit
+
+# Exécuter uniquement les tests d'intégration
+./vendor/bin/phpunit --testsuite Integration
+```
+
+## 🤝 Contribution
+
+Les contributions sont les bienvenues ! N'hésitez pas à ouvrir une issue ou une pull request.
+
+### Principes de développement
+
+Ce projet suit les principes SOLID et les bonnes pratiques de Clean Code :
+
+- **S**ingle Responsibility : Chaque classe a une responsabilité unique
+- **O**pen/Closed : Le système est ouvert à l'extension mais fermé à la modification
+- **L**iskov Substitution : Les sous-types sont substituables à leurs types de base
+- **I**nterface Segregation : Les interfaces sont spécifiques à leurs clients
+- **D**ependency Inversion : Dépendance vers les abstractions, non les implémentations
+
+## 📄 Licence
+
+Ce projet est sous licence MIT. Voir le fichier LICENSE pour plus d'informations.
