@@ -8,9 +8,11 @@ use App\Enum\TaskPriorityEnum;
 
 class TaskPriorityEnumType extends AbstractEnumType
 {
+    public const TYPE_NAME = 'task_priority_enum';
+
     public static function getTypeName(): string
     {
-        return 'task_priority_enum';
+        return self::TYPE_NAME;
     }
 
     protected static function getEnumClass(): string

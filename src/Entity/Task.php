@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Doctrine\Type\TaskPriorityEnumType;
 use App\Enum\TaskPriorityEnum;
 use App\Repository\TaskRepository;
 use Doctrine\ORM\Mapping as ORM;
@@ -20,7 +21,7 @@ class Task
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
 
-    #[ORM\Column(type: 'task_priority_enum')]
+    #[ORM\Column(type: TaskPriorityEnumType::TYPE_NAME)]
     private ?TaskPriorityEnum $priority = null;
 
     public function getId(): ?int
